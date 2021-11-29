@@ -40,13 +40,12 @@ const (
 	CfgNodeRuntimeID    = "node.runtime.id"
 
 	optRoleComputeWorker = "compute-worker"
-	optRoleStorageWorker = "storage-worker"
 	optRoleKeyManager    = "key-manager"
 	optRoleValidator     = "validator"
 
 	NodeGenesisFilename = "node_genesis.json"
 
-	maskCommitteeMember = node.RoleComputeWorker | node.RoleStorageWorker | node.RoleKeyManager
+	maskCommitteeMember = node.RoleComputeWorker | node.RoleKeyManager
 )
 
 var (
@@ -278,8 +277,6 @@ func argsToRolesMask() (node.RolesMask, error) {
 		switch v {
 		case optRoleComputeWorker:
 			rolesMask |= node.RoleComputeWorker
-		case optRoleStorageWorker:
-			rolesMask |= node.RoleStorageWorker
 		case optRoleKeyManager:
 			rolesMask |= node.RoleKeyManager
 		case optRoleValidator:
