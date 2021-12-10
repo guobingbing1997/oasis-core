@@ -2,6 +2,7 @@ package state
 
 import (
 	"crypto/rand"
+	"encoding/base64"
 	"math/big"
 	"testing"
 	"time"
@@ -284,22 +285,34 @@ func TestRewardAndSlash(t *testing.T) {
 		require.Equal(abciAPI.EventTypeForApp(AppName), ev.Type, "all emitted events should be staking events")
 		require.Len(ev.Attributes, 1, "each event should have a single attribute")
 
-		switch string(ev.Attributes[0].Key) {
+		key, err := base64.StdEncoding.DecodeString(ev.Attributes[0].Key)
+		require.NoError(err, "malformed event key")
+
+		val, err := base64.StdEncoding.DecodeString(ev.Attributes[0].Value)
+		require.NoError(err, "malformed event value")
+
+		switch string(key) {
 		case "add_escrow":
 			var v staking.AddEscrowEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		case "transfer":
 			var v staking.TransferEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		default:
-			t.Fatalf("unexpected event key: %+v", ev.Attributes[0].Key)
+			t.Fatalf("unexpected event key: %+v", key)
 		}
 	}
-	require.Equal("add_escrow", string(evs[0].Attributes[0].Key), "first event should be an add escrow event")
-	require.Equal("transfer", string(evs[1].Attributes[0].Key), "second event should be a transfer event")
-	require.Equal("add_escrow", string(evs[2].Attributes[0].Key), "second event should be an add escrow event")
+	e0key, err := base64.StdEncoding.DecodeString(evs[0].Attributes[0].Key)
+	require.NoError(err, "malformed event 0 key")
+	require.Equal("add_escrow", string(e0key), "first event should be an add escrow event")
+	e1key, err := base64.StdEncoding.DecodeString(evs[1].Attributes[0].Key)
+	require.NoError(err, "malformed event 1 key")
+	require.Equal("transfer", string(e1key), "second event should be a transfer event")
+	e2key, err := base64.StdEncoding.DecodeString(evs[2].Attributes[0].Key)
+	require.NoError(err, "malformed event 2 key")
+	require.Equal("add_escrow", string(e2key), "second event should be an add escrow event")
 
 	// 100% gain.
 	delegatorAccount, err = s.Account(ctx, delegatorAddr)
@@ -370,22 +383,34 @@ func TestRewardAndSlash(t *testing.T) {
 		require.Equal(abciAPI.EventTypeForApp(AppName), ev.Type, "all emitted events should be staking events")
 		require.Len(ev.Attributes, 1, "each event should have a single attribute")
 
-		switch string(ev.Attributes[0].Key) {
+		key, err := base64.StdEncoding.DecodeString(ev.Attributes[0].Key)
+		require.NoError(err, "malformed event key")
+
+		val, err := base64.StdEncoding.DecodeString(ev.Attributes[0].Value)
+		require.NoError(err, "malformed event value")
+
+		switch string(key) {
 		case "add_escrow":
 			var v staking.AddEscrowEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		case "transfer":
 			var v staking.TransferEvent
-			err = cbor.Unmarshal(ev.Attributes[0].Value, &v)
+			err = cbor.Unmarshal(val, &v)
 			require.NoError(err, "malformed add escrow event")
 		default:
-			t.Fatalf("unexpected event key: %+v", ev.Attributes[0].Key)
+			t.Fatalf("unexpected event key: %+v", key)
 		}
 	}
-	require.Equal("add_escrow", string(evs[0].Attributes[0].Key), "first event should be an add escrow event")
-	require.Equal("transfer", string(evs[1].Attributes[0].Key), "second event should be a transfer event")
-	require.Equal("add_escrow", string(evs[2].Attributes[0].Key), "second event should be an add escrow event")
+	e0key, err = base64.StdEncoding.DecodeString(evs[0].Attributes[0].Key)
+	require.NoError(err, "malformed event 0 key")
+	require.Equal("add_escrow", string(e0key), "first event should be an add escrow event")
+	e1key, err = base64.StdEncoding.DecodeString(evs[1].Attributes[0].Key)
+	require.NoError(err, "malformed event 1 key")
+	require.Equal("transfer", string(e1key), "second event should be a transfer event")
+	e2key, err = base64.StdEncoding.DecodeString(evs[2].Attributes[0].Key)
+	require.NoError(err, "malformed event 2 key")
+	require.Equal("add_escrow", string(e2key), "second event should be an add escrow event")
 
 	// 5% gain.
 	escrowAccount, err = s.Account(ctx, escrowAddr)

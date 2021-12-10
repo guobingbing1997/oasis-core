@@ -4,6 +4,7 @@ package registry
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/eapache/channels"
@@ -285,8 +286,20 @@ func EventsFromTendermint(
 		}
 
 		for _, pair := range tmEv.GetAttributes() {
-			key := pair.GetKey()
-			val := pair.GetValue()
+			bk := pair.GetKey()
+			bv := pair.GetValue()
+
+			var (
+				key []byte
+				val []byte
+				err error
+			)
+			if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+				return nil, nil, err
+			}
+			if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+				return nil, nil, err
+			}
 
 			switch {
 			case bytes.Equal(key, app.KeyRegistryNodeListEpoch):

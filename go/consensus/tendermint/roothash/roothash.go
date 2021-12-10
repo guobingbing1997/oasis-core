@@ -4,6 +4,7 @@ package roothash
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"math"
 	"sync"
@@ -473,9 +474,24 @@ func (sc *serviceClient) reindexBlocks(currentHeight int64, bh api.BlockHistory)
 			}
 
 			for _, pair := range tmEv.GetAttributes() {
-				if bytes.Equal(pair.GetKey(), app.KeyFinalized) {
+				bk := pair.GetKey()
+				bv := pair.GetValue()
+
+				var (
+					key []byte
+					val []byte
+					err error
+				)
+				if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+					return 0, err
+				}
+				if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+					return 0, err
+				}
+
+				if bytes.Equal(key, app.KeyFinalized) {
 					var value app.ValueFinalized
-					if err = cbor.Unmarshal(pair.GetValue(), &value); err != nil {
+					if err = cbor.Unmarshal(val, &value); err != nil {
 						logger.Error("failed to unmarshal finalized event",
 							"err", err,
 							"height", height,
@@ -734,8 +750,20 @@ func EventsFromTendermint(
 		}
 
 		for _, pair := range tmEv.GetAttributes() {
-			key := pair.GetKey()
-			val := pair.GetValue()
+			bk := pair.GetKey()
+			bv := pair.GetValue()
+
+			var (
+				key []byte
+				val []byte
+				err error
+			)
+			if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+				return nil, err
+			}
+			if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+				return nil, err
+			}
 
 			switch {
 			case bytes.Equal(key, app.KeyFinalized):

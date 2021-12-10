@@ -4,6 +4,7 @@ package api
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"strings"
 
@@ -103,9 +104,12 @@ type EventBuilder struct {
 
 // Attribute appends a key/value pair to the event.
 func (bld *EventBuilder) Attribute(key, value []byte) *EventBuilder {
+	bk := base64.StdEncoding.EncodeToString(key)
+	bv := base64.StdEncoding.EncodeToString(value)
+
 	bld.ev.Attributes = append(bld.ev.Attributes, types.EventAttribute{
-		Key:   key,
-		Value: value,
+		Key:   bk,
+		Value: bv,
 	})
 
 	return bld

@@ -1,8 +1,8 @@
 package api
 
 import (
-	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"time"
 
@@ -296,7 +296,7 @@ func (c *Context) HasEvent(evType string, key []byte) bool {
 		}
 
 		for _, pair := range ev.Attributes {
-			if bytes.Equal(pair.GetKey(), key) {
+			if pair.GetKey() == base64.StdEncoding.EncodeToString(key) {
 				return true
 			}
 		}

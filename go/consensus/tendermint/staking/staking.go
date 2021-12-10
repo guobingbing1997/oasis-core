@@ -3,6 +3,7 @@ package staking
 
 import (
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/hashicorp/go-multierror"
@@ -324,8 +325,20 @@ func EventsFromTendermint(
 		}
 
 		for _, pair := range tmEv.GetAttributes() {
-			key := pair.GetKey()
-			val := pair.GetValue()
+			bk := pair.GetKey()
+			bv := pair.GetValue()
+
+			var (
+				key []byte
+				val []byte
+				err error
+			)
+			if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+				return nil, err
+			}
+			if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+				return nil, err
+			}
 
 			switch {
 			case tmapi.IsAttributeKind(key, &api.TakeEscrowEvent{}):

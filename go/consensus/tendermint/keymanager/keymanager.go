@@ -5,6 +5,7 @@ package keymanager
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 
 	"github.com/eapache/channels"
@@ -80,9 +81,24 @@ func (sc *serviceClient) ServiceDescriptor() tmapi.ServiceDescriptor {
 // Implements api.ServiceClient.
 func (sc *serviceClient) DeliverEvent(ctx context.Context, height int64, tx tmtypes.Tx, ev *tmabcitypes.Event) error {
 	for _, pair := range ev.GetAttributes() {
-		if bytes.Equal(pair.GetKey(), app.KeyStatusUpdate) {
+		bk := pair.GetKey()
+		bv := pair.GetValue()
+
+		var (
+			key []byte
+			val []byte
+			err error
+		)
+		if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+			return err
+		}
+		if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+			return err
+		}
+
+		if bytes.Equal(key, app.KeyStatusUpdate) {
 			var statuses []*api.Status
-			if err := cbor.Unmarshal(pair.GetValue(), &statuses); err != nil {
+			if err := cbor.Unmarshal(val, &statuses); err != nil {
 				sc.logger.Error("worker: failed to get statuses from tag",
 					"err", err,
 				)

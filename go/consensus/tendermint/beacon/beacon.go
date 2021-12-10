@@ -5,6 +5,7 @@ package beacon
 import (
 	"bytes"
 	"context"
+	"encoding/base64"
 	"fmt"
 	"sync"
 
@@ -283,8 +284,20 @@ func (sc *serviceClient) DeliverBlock(ctx context.Context, height int64) error {
 
 func (sc *serviceClient) DeliverEvent(ctx context.Context, height int64, tx tmtypes.Tx, ev *tmabcitypes.Event) error {
 	for _, pair := range ev.GetAttributes() {
-		key := pair.GetKey()
-		val := pair.GetValue()
+		bk := pair.GetKey()
+		bv := pair.GetValue()
+
+		var (
+			key []byte
+			val []byte
+			err error
+		)
+		if key, err = base64.StdEncoding.DecodeString(bk); err != nil {
+			return err
+		}
+		if val, err = base64.StdEncoding.DecodeString(bv); err != nil {
+			return err
+		}
 
 		if bytes.Equal(key, app.KeyEpoch) {
 			var epoch beaconAPI.EpochTime
