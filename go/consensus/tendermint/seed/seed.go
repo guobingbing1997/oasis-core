@@ -298,6 +298,8 @@ func New(dataDir string, identity *identity.Identity, genesisProvider genesis.Pr
 		return nil, fmt.Errorf("tendermint/seed: failed to initialize data dir: %w", err)
 	}
 
+	logger := tmcommon.NewLogAdapter(!viper.GetBool(tmcommon.CfgLogDebug))
+
 	p2pCfg := config.DefaultP2PConfig()
 	p2pCfg.ListenAddress = viper.GetString(tmcommon.CfgCoreListenAddress)
 	p2pCfg.BootstrapPeers = strings.ToLower(strings.Join(viper.GetStringSlice(tmcommon.CfgP2PSeed), ","))
@@ -309,15 +311,6 @@ func New(dataDir string, identity *identity.Identity, genesisProvider genesis.Pr
 	p2pCfg.AddrBookStrict = !(viper.GetBool(tmcommon.CfgDebugP2PAddrBookLenient) && cmflags.DebugDontBlameOasis())
 	p2pCfg.AllowDuplicateIP = viper.GetBool(tmcommon.CfgDebugP2PAllowDuplicateIP) && cmflags.DebugDontBlameOasis()
 
-	nodeCfg := config.DefaultConfig()
-	nodeCfg.Mode = config.ModeSeed
-	nodeCfg.Moniker = "oasis-seed-" + identity.P2PSigner.Public().String()
-	nodeCfg.P2P = p2pCfg
-	nodeCfg.SetRoot(seedDataDir)
-
-	tmpk := crypto.SignerToTendermint(identity.P2PSigner)
-	nodeKey := tmtypes.NodeKey{ID: tmtypes.NodeIDFromPubKey(tmpk.PubKey()), PrivKey: tmpk}
-
 	doc, err := genesisProvider.GetGenesisDocument()
 	if err != nil {
 		return nil, fmt.Errorf("tendermint/seed: failed to get genesis document: %w", err)
@@ -327,21 +320,54 @@ func New(dataDir string, identity *identity.Identity, genesisProvider genesis.Pr
 		return api.GetTendermintGenesisDocument(genesisProvider)
 	}
 
-	logger := tmcommon.NewLogAdapter(!viper.GetBool(tmcommon.CfgLogDebug))
+	if !(viper.GetBool(CfgDebugDisableAddrBookFromGenesis) && cmflags.DebugDontBlameOasis()) {
+		// Since we don't have access to the address book, add the genesis nodes
+		// to the bootstrap peers instead.
+		var addrs []string
+		for _, v := range doc.Registry.Nodes {
+			var openedNode node.Node
+			if err := v.Open(registry.RegisterGenesisNodeSignatureContext, &openedNode); err != nil {
+				return nil, fmt.Errorf("tendermint/seed: failed to verify validator: %w", err)
+			}
+			// TODO: This should cross check that the entity is valid.
+			if !openedNode.HasRoles(node.RoleValidator) {
+				continue
+			}
+
+			var tmvAddr *tmtypes.NetAddress
+			tmvAddr, err := api.NodeToP2PAddr(&openedNode)
+			if err != nil {
+				logger.Error("failed to reformat genesis validator address",
+					"err", err,
+				)
+				continue
+			}
+
+			addrs = append(addrs, tmvAddr.String())
+		}
+		if len(addrs) > 0 {
+			if len(p2pCfg.BootstrapPeers) > 0 {
+				p2pCfg.BootstrapPeers = p2pCfg.BootstrapPeers + ","
+			}
+			p2pCfg.BootstrapPeers = p2pCfg.BootstrapPeers + strings.Join(addrs, ",")
+		}
+	}
+
+	logger.Info("*** p2pCfg.BootstrapPeers ***", "peers", p2pCfg.BootstrapPeers)
+
+	nodeCfg := config.DefaultConfig()
+	nodeCfg.Mode = config.ModeSeed
+	nodeCfg.Moniker = "oasis-seed-" + identity.P2PSigner.Public().String()
+	nodeCfg.P2P = p2pCfg
+	nodeCfg.SetRoot(seedDataDir)
+
+	tmpk := crypto.SignerToTendermint(identity.P2PSigner)
+	nodeKey := tmtypes.NodeKey{ID: tmtypes.NodeIDFromPubKey(tmpk.PubKey()), PrivKey: tmpk}
 
 	dbProvider, err := db.GetProvider()
 	if err != nil {
 		return nil, fmt.Errorf("tendermint/seed: failed to get database provider")
 	}
-
-	// XXX: TODO
-	/*addrBookPath := filepath.Join(seedDataDir, tmcommon.ConfigDir, "addrbook.json")
-
-	if !(viper.GetBool(CfgDebugDisableAddrBookFromGenesis) && cmflags.DebugDontBlameOasis()) {
-		if err = populateAddrBookFromGenesis(srv.addrBook, doc, srv.addr); err != nil {
-			return nil, fmt.Errorf("tendermint/seed: failed to populate address book from genesis: %w", err)
-		}
-	}*/
 
 	srv.seedSrv, err = tmnode.MakeSeedNode(nodeCfg, dbProvider, nodeKey, tmGenesisProvider, logger)
 	if err != nil {
@@ -350,50 +376,6 @@ func New(dataDir string, identity *identity.Identity, genesisProvider genesis.Pr
 
 	return srv, nil
 }
-
-/*func populateAddrBookFromGenesis(addrBook p2p.AddrBook, doc *genesis.Document, ourAddr *p2p.NetAddress) error {
-	logger := logging.GetLogger("consensus/tendermint/seed")
-
-	// Convert to a representation suitable for address book population.
-	var addrs []*p2p.NetAddress
-	for _, v := range doc.Registry.Nodes {
-		var openedNode node.Node
-		if err := v.Open(registry.RegisterGenesisNodeSignatureContext, &openedNode); err != nil {
-			return fmt.Errorf("tendermint/seed: failed to verify validator: %w", err)
-		}
-		// TODO: This should cross check that the entity is valid.
-		if !openedNode.HasRoles(node.RoleValidator) {
-			continue
-		}
-
-		var tmvAddr *p2p.NetAddress
-		tmvAddr, err := api.NodeToP2PAddr(&openedNode)
-		if err != nil {
-			logger.Error("failed to reformat genesis validator address",
-				"err", err,
-			)
-			continue
-		}
-
-		addrs = append(addrs, tmvAddr)
-	}
-
-	// Populate the address book with the genesis validators.
-	addrBook.AddOurAddress(ourAddr) // Required or AddrBook.AddAddress will fail.
-	for _, v := range addrs {
-		// Remove the address first as otherwise Tendermint's address book
-		// may not actually add the new address.
-		addrBook.RemoveAddress(v)
-
-		if err := addrBook.AddAddress(v, ourAddr); err != nil {
-			logger.Error("failed to add genesis validator to address book",
-				"err", err,
-			)
-		}
-	}
-
-	return nil
-}*/
 
 func init() {
 	Flags.Bool(CfgDebugDisableAddrBookFromGenesis, false, "disable populating address book with genesis validators")

@@ -1146,11 +1146,11 @@ func (t *fullService) lazyInit() error {
 	// Since persistent peers is expected to be in comma-delimited ID format,
 	// lowercasing the whole string is ok.
 	tenderConfig.P2P.UnconditionalPeerIDs = strings.ToLower(strings.Join(viper.GetStringSlice(CfgP2PUnconditionalPeerIDs), ","))
-	// Seed Ids need to be lowercase as p2p/transport.go:MultiplexTransport.upgrade()
+	// Bootstrap peer IDs need to be lowercase as p2p/transport.go:MultiplexTransport.upgrade()
 	// uses a case sensitive string comparison to validate public keys.
 	// Since Seeds is expected to be in comma-delimited ID@host:port format,
 	// lowercasing the whole string is ok.
-	tenderConfig.P2P.Seeds = strings.ToLower(strings.Join(viper.GetStringSlice(tmcommon.CfgP2PSeed), ","))
+	tenderConfig.P2P.BootstrapPeers = strings.ToLower(strings.Join(viper.GetStringSlice(tmcommon.CfgP2PSeed), ","))
 	tenderConfig.P2P.AddrBookStrict = !(viper.GetBool(tmcommon.CfgDebugP2PAddrBookLenient) && cmflags.DebugDontBlameOasis())
 	tenderConfig.P2P.AllowDuplicateIP = viper.GetBool(tmcommon.CfgDebugP2PAllowDuplicateIP) && cmflags.DebugDontBlameOasis()
 	tenderConfig.RPC.ListenAddress = ""
